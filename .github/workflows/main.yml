@@ -1,12 +1,16 @@
-name: Deploy IoT Server
+name: CI/CD for IoT Server
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  deploy:
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -18,40 +22,34 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Dependencies
+      - name: Install Backend Dependencies
         run: |
           cd backend
           npm install
-          cd ../web_app/Source_webapp
-          npm install
-          cd ../../admin_web_app/Source_webapp
-          npm install
 
-      - name: Build Backend
-        run: |
-          cd backend
-          npm run build
-
-      - name: Build Web App
+      - name: Install Web App Dependencies
         run: |
           cd web_app/Source_webapp
-          npm run build
+          npm install
 
-      - name: Build Admin Web App
+      - name: Install Admin Web App Dependencies
         run: |
-          cd ../../admin_web_app/Source_webapp
-          npm run build
+          cd admin_web_app/Source_webapp
+          npm install
 
-      - name: Deploy Application
-        env:
-          SERVER_IP: ${{ secrets.SERVER_IP }}
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+      - name: Run Backend Tests
         run: |
-          echo "$SSH_PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
-          scp -i private_key.pem -r backend/dist/* $SSH_USERNAME@$SERVER_IP:/home/iot-server/backend/
-          scp -i private_key.pem -r web_app/Source_webapp/dist/* $SSH_USERNAME@$SERVER_IP:/home/iot-server/web_app/Source_webapp/
-          scp -i private_key.pem -r admin_web_app/Source_webapp/dist/* $SSH_USERNAME@$SERVER_IP:/home/iot-server/admin_web_app/Source_webapp/
-          ssh -i private_key.pem $SSH_USERNAME@$SERVER_IP 'bash -s' < ./update.sh
+          cd backend
+          npm test
+
+      - name: Run Web App Tests
+        run: |
+          cd web_app/Source_webapp
+          npm test
+
+      - name: Run Admin Web App Tests
+        run: |
+          cd admin_web_app/Source_webapp
+          npm test
+
 
