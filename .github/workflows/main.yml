@@ -1,18 +1,16 @@
-name: CI/CD Pipeline
+name: Deploy IoT Server
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -21,20 +19,39 @@ jobs:
           node-version: '20'
 
       - name: Install Dependencies
-        run: npm install
-
-      - name: Run Tests
-        run: npm test
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Deploy to Production
         run: |
-          echo "Deploying..."
-          # Add deployment commands here, e.g., SSH to a server or trigger a cloud function
+          cd backend
+          npm install
+          cd ../web_app/Source_webapp
+          npm install
+          cd ../../admin_web_app/Source_webapp
+          npm install
+
+      - name: Build Backend
+        run: |
+          cd backend
+          npm run build
+
+      - name: Build Web App
+        run: |
+          cd web_app/Source_webapp
+          npm run build
+
+      - name: Build Admin Web App
+        run: |
+          cd ../../admin_web_app/Source_webapp
+          npm run build
+
+      - name: Deploy Application
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          scp -i private_key.pem -r backend/dist/* $SSH_USERNAME@$SERVER_IP:/home/iot-server/backend/
+          scp -i private_key.pem -r web_app/Source_webapp/dist/* $SSH_USERNAME@$SERVER_IP:/home/iot-server/web_app/Source_webapp/
+          scp -i private_key.pem -r admin_web_app/Source_webapp/dist/* $SSH_USERNAME@$SERVER_IP:/home/iot-server/admin_web_app/Source_webapp/
+          ssh -i private_key.pem $SSH_USERNAME@$SERVER_IP 'bash -s' < ./update.sh
+
